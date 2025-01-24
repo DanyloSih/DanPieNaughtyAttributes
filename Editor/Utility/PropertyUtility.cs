@@ -119,6 +119,23 @@ namespace NaughtyAttributes.Editor
             }
         }
 
+        public static bool IsVisibleInHierarchy(SerializedProperty property)
+        {
+            while (property != null)
+            {
+                if (!PropertyUtility.IsVisible(property))
+                {
+                    return false;
+                }
+
+                property = property.propertyPath.Contains(".")
+                    ? property.serializedObject.FindProperty(property.propertyPath.Substring(0, property.propertyPath.LastIndexOf('.')))
+                    : null;
+            }
+
+            return true;
+        }
+
         public static bool IsVisible(SerializedProperty property)
         {
             ShowIfAttributeBase showIfAttribute = GetAttribute<ShowIfAttributeBase>(property);

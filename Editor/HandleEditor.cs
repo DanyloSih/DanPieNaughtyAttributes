@@ -25,7 +25,7 @@ namespace NaughtyAttributes.Editor
                     string propertyPath = pathPrefix + field.Name;
                     SerializedProperty property = serializedObject.FindProperty(propertyPath);
 
-                    if (property != null && IsVisibleInHierarchy(property))
+                    if (property != null && PropertyUtility.IsVisibleInHierarchy(property))
                     {
                         if (field.FieldType == typeof(Vector3))
                         {
@@ -46,23 +46,6 @@ namespace NaughtyAttributes.Editor
                     }
                 }
             }
-        }
-
-        private bool IsVisibleInHierarchy(SerializedProperty property)
-        {
-            while (property != null)
-            {
-                if (!PropertyUtility.IsVisible(property))
-                {
-                    return false;
-                }
-
-                property = property.propertyPath.Contains(".")
-                    ? property.serializedObject.FindProperty(property.propertyPath.Substring(0, property.propertyPath.LastIndexOf('.')))
-                    : null;
-            }
-
-            return true;
         }
 
         private void DrawHandle(SerializedProperty property, MonoBehaviour owner, HandleType handleType)
