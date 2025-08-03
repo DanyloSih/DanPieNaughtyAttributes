@@ -17,33 +17,52 @@ namespace NaughtyAttributes.Editor
 
         private void DrawHandles(SerializedObject serializedObject, Type type, object targetObject, string pathPrefix)
         {
+            if (serializedObject.targetObject == null || targetObject == null)
+                return;
+
             foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
             {
-                var handleAttribute = field.GetCustomAttribute<HandleAttribute>();
-                if (handleAttribute != null)
+                try
                 {
-                    string propertyPath = pathPrefix + field.Name;
-                    SerializedProperty property = serializedObject.FindProperty(propertyPath);
-
-                    if (property != null && PropertyUtility.IsVisibleInHierarchy(property))
+                    var handleAttribute = field.GetCustomAttribute<HandleAttribute>();
+                    if (handleAttribute != null)
                     {
-                        if (field.FieldType == typeof(Vector3))
+                        string propertyPath = pathPrefix + field.Name;
+                        SerializedProperty property = serializedObject.FindProperty(propertyPath);
+
+                        if (property != null && PropertyUtility.IsVisibleInHierarchy(property))
                         {
-                            DrawHandle(property, (MonoBehaviour)serializedObject.targetObject, handleAttribute.Type);
+                            if (field.FieldType == typeof(Vector3))
+                            {
+                                DrawHandle(property, (MonoBehaviour)serializedObject.targetObject, handleAttribute.Type);
+                            }
+                            else if (typeof(IList).IsAssignableFrom(field.FieldType))
+                            {
+                                DrawListHandles(property, (MonoBehaviour)serializedObject.targetObject, handleAttribute.Type);
+                            }
                         }
-                        else if (typeof(IList).IsAssignableFrom(field.FieldType))
+                    }
+                    else if (IsSafeToRecurse(field.FieldType))
+                    {
+                        object nestedObject = null;
+                        try
                         {
-                            DrawListHandles(property, (MonoBehaviour)serializedObject.targetObject, handleAttribute.Type);
+                            nestedObject = field.GetValue(targetObject);
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogWarning($"Field '{field.Name}' could not be accessed: {e.Message}");
+                        }
+
+                        if (nestedObject != null)
+                        {
+                            DrawHandles(serializedObject, field.FieldType, nestedObject, pathPrefix + field.Name + ".");
                         }
                     }
                 }
-                else if (field.FieldType.IsSerializable && !field.FieldType.IsPrimitive && field.FieldType != typeof(string))
+                catch (Exception ex)
                 {
-                    object nestedObject = field.GetValue(targetObject);
-                    if (nestedObject != null)
-                    {
-                        DrawHandles(serializedObject, field.FieldType, nestedObject, pathPrefix + field.Name + ".");
-                    }
+                    Debug.LogWarning($"Failed to process field '{field.Name}' in type '{type}': {ex.Message}");
                 }
             }
         }
@@ -90,6 +109,17 @@ namespace NaughtyAttributes.Editor
                     }
                 }
             }
+        }
+
+        private bool IsSafeToRecurse(Type fieldType)
+        {
+            return
+                fieldType.IsSerializable &&
+                !fieldType.IsPrimitive &&
+                fieldType != typeof(string) &&
+                !typeof(IDictionary).IsAssignableFrom(fieldType) &&
+                !fieldType.IsGenericType &&  // Skip things like Dictionary<,>
+                !typeof(IEnumerable).IsAssignableFrom(fieldType); // Skip any collection
         }
     }
 }
